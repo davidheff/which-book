@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f2933">
+<title>Real Book Songfinder</title>
+<!-- Installable app (Add to Home Screen on iPad / Install on Android) -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Songfinder">
+<style>
+  :root{
+    --bg:#0f1419; --panel:#1b232c; --panel2:#232f3a; --text:#e7edf3;
+    --muted:#9fb0c0; --accent:#4ea1ff; --accent2:#7cd3a0; --line:#2c3a47;
+    --hi:#ffd65c;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:var(--bg); color:var(--text);
+    font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-text-size-adjust:100%;
+  }
+  .wrap{max-width:760px;margin:0 auto;padding:env(safe-area-inset-top) 16px 96px;}
+  header{padding:22px 2px 10px;}
+  h1{font-size:22px;margin:0 0 2px;letter-spacing:.2px}
+  .sub{color:var(--muted);font-size:13px;margin:0}
+  .searchbar{
+    position:sticky;top:0;z-index:5;background:linear-gradient(var(--bg) 70%,transparent);
+    padding:10px 0 12px;
+  }
+  #q{
+    width:100%;padding:14px 44px 14px 16px;font-size:17px;border-radius:12px;
+    border:1px solid var(--line);background:var(--panel);color:var(--text);outline:none;
+  }
+  #q:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(78,161,255,.18)}
+  .qbox{position:relative}
+  .clear{position:absolute;right:8px;top:50%;transform:translateY(-50%);
+    border:0;background:transparent;color:var(--muted);font-size:22px;cursor:pointer;
+    padding:6px 10px;line-height:1;display:none}
+  .count{color:var(--muted);font-size:13px;margin:2px 2px 10px}
+  ul{list-style:none;margin:0;padding:0}
+  li.song{
+    background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:12px 14px;margin:0 0 10px;
+  }
+  .title{font-size:17px;font-weight:600;margin-bottom:7px}
+  .title mark{background:var(--hi);color:#1a1a1a;border-radius:3px;padding:0 1px}
+  .books{display:flex;flex-direction:column;gap:5px}
+  .book{display:flex;align-items:baseline;gap:9px;color:var(--muted);font-size:14px}
+  .badge{
+    flex:0 0 auto;min-width:26px;text-align:center;font-variant-numeric:tabular-nums;
+    background:var(--panel2);color:var(--accent2);border:1px solid var(--line);
+    border-radius:6px;padding:1px 6px;font-size:12px;font-weight:600
+  }
+  .bookname{color:var(--text)}
+  .empty,.hint{color:var(--muted);text-align:center;padding:40px 10px;font-size:15px}
+  .hint b{color:var(--text)}
+  mark.none{display:none}
+  footer{position:fixed;bottom:0;left:0;right:0;background:rgba(15,20,25,.92);
+    border-top:1px solid var(--line);font-size:11px;color:var(--muted);
+    text-align:center;padding:8px 12px calc(8px + env(safe-area-inset-bottom));backdrop-filter:blur(6px)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Real Book Songfinder</h1>
+    <p class="sub">Type a song name to see which Real Book(s) contain it.</p>
+  </header>
+  <div class="searchbar">
+    <div class="qbox">
+      <input id="q" type="search" inputmode="search" autocomplete="off"
+             autocapitalize="off" spellcheck="false" placeholder="Search song title…" autofocus>
+      <button class="clear" id="clear" aria-label="Clear">&times;</button>
+    </div>
+    <div class="count" id="count"></div>
+  </div>
+  <ul id="results"></ul>
+  <div class="hint" id="hint">Start typing above. Matches any part of the title — try <b>blue</b>, <b>my funny</b>, or <b>giant steps</b>.</div>
+</div>
+<footer>Indexed from The Real Book Songfinder (3.14.2016) · <span id="total"></span> songs across 27 books · runs entirely offline</footer>
+
+<script id="data" type="application/json">/*__DATA__*/</script>
+<script>
+const DATA = JSON.parse(document.getElementById('data').textContent);
+const BOOKS = DATA.books, SONGS = DATA.songs;
+const MAX_RESULTS = 300;
+
+// Fold a title to a search key AND a map from each key-char back to its
+// original-string index (so we can highlight the match on the original).
+// Folding: lowercase, strip accents, drop quotes/apostrophes, turn any other
+// punctuation into a space, then collapse/trim spaces. This makes search
+// insensitive to accents and punctuation: typing "agua de beber" finds
+// "Água De Beber", "take the a train" finds "Take The 'A' Train", etc.
+const QUOTES=/['’‘ʼ`"“”]/, COMBINING=/[̀-ͯ]/g;
+function foldChar(c){
+  c=c.toLowerCase().normalize('NFD').replace(COMBINING,'');
+  if(QUOTES.test(c)) return '';
+  return c.replace(/[^a-z0-9]+/g,' ');
+}
+function buildIndex(str){
+  let n='', map=[];
+  for(let i=0;i<str.length;i++){
+    for(const ch of foldChar(str[i])){
+      if(ch===' ' && (n.length===0 || n[n.length-1]===' ')) continue; // collapse + no leading
+      n+=ch; map.push(i);
+    }
+  }
+  while(n.length && n[n.length-1]===' '){ n=n.slice(0,-1); map.pop(); } // trim trailing
+  return {n, map};
+}
+function fold(str){ return buildIndex(str).n; }
+
+// precompute search key + offset map for every song
+for(const s of SONGS){ const ix=buildIndex(s.title); s._n=ix.n; s._map=ix.map; }
+
+const elQ=document.getElementById('q'), elRes=document.getElementById('results'),
+      elCount=document.getElementById('count'), elHint=document.getElementById('hint'),
+      elClear=document.getElementById('clear');
+document.getElementById('total').textContent = SONGS.length.toLocaleString();
+
+function esc(s){return s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+
+// wrap the matched span (key indices qi..qi+qlen-1) in <mark> on the original title.
+function highlight(title, map, qi, qlen){
+  if(qi<0) return esc(title);
+  const startO = map[qi] ?? 0;
+  const endO   = map[qi+qlen-1] ?? (title.length-1);
+  return esc(title.slice(0,startO))
+       + '<mark>'+esc(title.slice(startO,endO+1))+'</mark>'
+       + esc(title.slice(endO+1));
+}
+
+function render(q){
+  const qn = fold(q);
+  elClear.style.display = q ? 'block':'none';
+  if(!qn){ elRes.innerHTML=''; elCount.textContent=''; elHint.style.display='block'; return; }
+  elHint.style.display='none';
+
+  const exact=[], prefix=[], word=[], sub=[];
+  for(const s of SONGS){
+    const i = s._n.indexOf(qn);
+    if(i<0) continue;
+    s._i=i;
+    if(s._n===qn) exact.push(s);
+    else if(i===0) prefix.push(s);
+    else if(s._n[i-1]===' ') word.push(s);
+    else sub.push(s);
+  }
+  const byTitle=(a,b)=>a._n<b._n?-1:a._n>b._n?1:0;
+  exact.sort(byTitle);prefix.sort(byTitle);word.sort(byTitle);sub.sort(byTitle);
+  const all=[...exact,...prefix,...word,...sub];
+  const total=all.length;
+  const shown=all.slice(0,MAX_RESULTS);
+
+  elCount.textContent = total ? `${total} match${total>1?'es':''}${total>MAX_RESULTS?` (showing first ${MAX_RESULTS})`:''}` : '';
+
+  if(!total){ elRes.innerHTML=`<div class="empty">No songs match “${esc(q)}”.</div>`; return; }
+
+  const frag=[];
+  for(const s of shown){
+    const books = s.books.map(b=>
+      `<div class="book"><span class="badge">${b}</span><span class="bookname">${esc(BOOKS[b]||'Book '+b)}</span></div>`
+    ).join('');
+    frag.push(`<li class="song"><div class="title">${highlight(s.title,s._map,s._i,qn.length)}</div><div class="books">${books}</div></li>`);
+  }
+  elRes.innerHTML=frag.join('');
+  window.scrollTo(0,0);
+}
+
+let t;
+elQ.addEventListener('input',e=>{clearTimeout(t);t=setTimeout(()=>render(e.target.value),90);});
+elClear.addEventListener('click',()=>{elQ.value='';render('');elQ.focus();});
+render('');
+
+// Register service worker for offline + installability (no-op on file://).
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+}
+</script>
+</body>
+</html>

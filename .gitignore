@@ -1,0 +1,11 @@
+# Source PDF is a third-party copyrighted publication — not redistributed.
+*.pdf
+
+# Python
+__pycache__/
+*.pyc
+
+# Misc
+icon-preview.png
+.DS_Store
+Thumbs.db
