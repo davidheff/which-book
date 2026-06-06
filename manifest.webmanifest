@@ -1,6 +1,6 @@
 {
-  "name": "Real Book Songfinder",
-  "short_name": "Songfinder",
+  "name": "Which Book",
+  "short_name": "Which Book",
   "description": "Search jazz Real Book songs and see which book(s) contain each one. Works offline.",
   "lang": "en",
   "start_url": "./",

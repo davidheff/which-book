@@ -1,4 +1,4 @@
-# Real Book Songfinder
+# Which Book
 
 A tiny, self-contained web app to search the 4,893 songs indexed in *The Real Book
 Songfinder* (3.14.2016) and see which Real Book volume(s) each one appears in.
@@ -51,8 +51,8 @@ account — the Safari "Add to Home Screen" install above is the supported path 
 `index.html`, `manifest.webmanifest`, `sw.js`, and the four PNG icons
 (`icon-192.png`, `icon-512.png`, `apple-touch-icon.png`, `favicon-32.png`).
 
-> When you rebuild `index.html`, bump `CACHE` in `sw.js` (e.g. `rbsf-v1` → `rbsf-v2`) so
-> installed copies pick up the new data.
+> When you rebuild `index.html`, bump `CACHE` in `sw.js` (e.g. `whichbook-v1` →
+> `whichbook-v2`) so installed copies pick up the new data.
 
 ## Rebuilding from the PDF
 
