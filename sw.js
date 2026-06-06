@@ -1,6 +1,6 @@
 // Service worker: makes the app installable and fully offline.
 // Bump CACHE when you rebuild index.html to push the update to installed apps.
-const CACHE = 'whichbook-v2';
+const CACHE = 'whichbook-v3';
 const ASSETS = [
   './', './index.html', './manifest.webmanifest',
   './icon-192.png', './icon-512.png', './apple-touch-icon.png', './favicon-32.png'
